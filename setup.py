@@ -48,6 +48,7 @@ extras_require = {
     "tests": [
         "aiohttp",
         "boto3",
+        "httpcore",
         "httplib2",
         "httpx",
         "pytest-aiohttp",
