@@ -351,3 +351,17 @@ def test_gzip__decode_compressed_response_true(do_request, tmpdir, httpbin):
         # As the content is uncompressed, it should have a bigger
         # length than the compressed version.
         assert r.headers["content-length"] > content_length
+
+
+def test_sync_in_async_context(tmpdir, httpbin):
+    async def run():
+        url = httpbin.url
+
+        with vcr.use_cassette(str(tmpdir.join("sync_in_async_context.yaml"))):
+            DoSyncRequest()("GET", url)
+
+        with vcr.use_cassette(str(tmpdir.join("sync_in_async_context.yaml"))) as cassette:
+            DoSyncRequest()("GET", url)
+            assert cassette.play_count == 1
+
+    asyncio.run(run())
