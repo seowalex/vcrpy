@@ -125,7 +125,6 @@ def yml(tmpdir, request):
     return str(tmpdir.join(request.function.__name__ + ".yaml"))
 
 
-@pytest.mark.online
 def test_status(tmpdir, httpbin, do_request):
     url = httpbin.url
 
@@ -138,7 +137,6 @@ def test_status(tmpdir, httpbin, do_request):
         assert cassette.play_count == 1
 
 
-@pytest.mark.online
 def test_case_insensitive_headers(tmpdir, httpbin, do_request):
     url = httpbin.url
 
@@ -152,7 +150,6 @@ def test_case_insensitive_headers(tmpdir, httpbin, do_request):
         assert cassette.play_count == 1
 
 
-@pytest.mark.online
 def test_content(tmpdir, httpbin, do_request):
     url = httpbin.url
 
@@ -165,7 +162,6 @@ def test_content(tmpdir, httpbin, do_request):
         assert cassette.play_count == 1
 
 
-@pytest.mark.online
 def test_json(tmpdir, httpbin, do_request):
     url = httpbin.url + "/json"
 
@@ -178,7 +174,6 @@ def test_json(tmpdir, httpbin, do_request):
         assert cassette.play_count == 1
 
 
-@pytest.mark.online
 def test_params_same_url_distinct_params(tmpdir, httpbin, do_request):
     url = httpbin.url + "/get"
     headers = {"Content-Type": "application/json"}
@@ -201,7 +196,6 @@ def test_params_same_url_distinct_params(tmpdir, httpbin, do_request):
         do_request()("GET", url, params=params, headers=headers)
 
 
-@pytest.mark.online
 def test_redirect(httpbin, yml, do_request):
     url = httpbin.url + "/redirect-to"
 
@@ -236,7 +230,6 @@ def test_simple_fetching(do_request, yml, url):
         assert cassette.play_count == 1
 
 
-@pytest.mark.online
 def test_cookies(tmpdir, httpbin, do_request):
     def client_cookies(client):
         return list(client.client.cookies)
@@ -272,7 +265,6 @@ def test_cookies(tmpdir, httpbin, do_request):
             assert client_cookies(new_client) == ["k1", "k2"]
 
 
-@pytest.mark.online
 def test_stream(tmpdir, httpbin, do_request):
     url = httpbin.url + "/stream-bytes/512"
     testfile = str(tmpdir.join("stream.yml"))
