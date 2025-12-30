@@ -2,8 +2,7 @@ import functools
 import logging
 from collections import defaultdict
 
-from httpcore import Response
-from httpcore._models import ByteStream
+from httpx import ByteStream, Response
 
 from vcr.errors import CannotOverwriteExistingCassetteException
 from vcr.filters import decode_response
@@ -21,21 +20,15 @@ def _serialize_headers(real_response):
 
     headers = defaultdict(list)
 
-    for name, value in real_response.headers:
-        headers[name.decode("ascii")].append(value.decode("ascii"))
+    for name, value in real_response.headers.multi_items():
+        headers[name].append(value)
 
     return dict(headers)
 
 
 def _serialize_response(real_response, real_response_content):
-    # The reason_phrase may not exist
-    try:
-        reason_phrase = real_response.extensions["reason_phrase"].decode("ascii")
-    except KeyError:
-        reason_phrase = None
-
     return {
-        "status": {"code": real_response.status, "message": reason_phrase},
+        "status": {"code": real_response.status_code, "message": real_response.reason_phrase},
         "headers": _serialize_headers(real_response),
         "body": {"string": real_response_content},
     }
@@ -43,12 +36,10 @@ def _serialize_response(real_response, real_response_content):
 
 def _deserialize_headers(headers):
     """
-    httpcore accepts headers as list of tuples of header key and value.
+    httpx accepts headers as list of tuples of header key and value.
     """
 
-    return [
-        (name.encode("ascii"), value.encode("ascii")) for name, values in headers.items() for value in values
-    ]
+    return [(name, value) for name, values in headers.items() for value in values]
 
 
 def _deserialize_response(vcr_response):
@@ -67,32 +58,20 @@ def _deserialize_response(vcr_response):
         )
         extensions = None
     else:
-        extensions = (
-            {"reason_phrase": vcr_response["status"]["message"].encode("ascii")}
-            if vcr_response["status"]["message"]
-            else None
-        )
+        extensions = {"reason_phrase": vcr_response["status"]["message"].encode("ascii")}
 
     return Response(
         vcr_response["status"]["code"],
         headers=_deserialize_headers(vcr_response["headers"]),
-        content=vcr_response["body"]["string"],
+        # Don't use content, because that closes the response,
+        # which we do not want as the real response is unclosed
+        stream=ByteStream(vcr_response["body"]["string"]),
         extensions=extensions,
     )
 
 
 def _make_vcr_request(real_request, real_request_body):
-    uri = bytes(real_request.url).decode("ascii")
-
-    # As per HTTPX: If there are multiple headers with the same key, then we concatenate them with commas
-    headers = defaultdict(list)
-
-    for name, value in real_request.headers:
-        headers[name.decode("ascii")].append(value.decode("ascii"))
-
-    headers = {name: ", ".join(values) for name, values in headers.items()}
-
-    return VcrRequest(real_request.method.decode("ascii"), uri, real_request_body, headers)
+    return VcrRequest(real_request.method, str(real_request.url), real_request_body, real_request.headers)
 
 
 def _vcr_request(cassette, real_request, real_request_body):

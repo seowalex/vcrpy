@@ -125,6 +125,19 @@ def yml(tmpdir, request):
     return str(tmpdir.join(request.function.__name__ + ".yaml"))
 
 
+def test_response_elapsed(tmpdir, httpbin, do_request):
+    url = httpbin.url
+
+    with vcr.use_cassette(str(tmpdir.join("elapsed.yaml"))):
+        response = do_request()("GET", url)
+
+    with vcr.use_cassette(str(tmpdir.join("elapsed.yaml"))):
+        cassette_response = do_request()("GET", url)
+
+        assert response.elapsed
+        assert cassette_response.elapsed
+
+
 def test_status(tmpdir, httpbin, do_request):
     url = httpbin.url
 
@@ -365,3 +378,63 @@ def test_sync_in_async_context(tmpdir, httpbin):
             assert cassette.play_count == 1
 
     asyncio.run(run())
+
+
+def test_custom_transports(tmpdir, httpbin):
+    url = httpbin.url
+    transport = httpx.MockTransport(lambda _: httpx.Response(200, json={"text": "Hello, world!"}))
+
+    with vcr.use_cassette(str(tmpdir.join("mock_transport.yaml"))):
+        response = DoSyncRequest(transport=transport)("GET", url)
+
+    with vcr.use_cassette(str(tmpdir.join("mock_transport.yaml"))) as cassette:
+        cassette_response = DoSyncRequest(transport=transport)("GET", url)
+
+        assert cassette_response.status_code == response.status_code
+        assert cassette.play_count == 1
+
+    try:
+        from httpx_curl_cffi import AsyncCurlTransport, CurlTransport
+    except ImportError:
+        pass
+    else:
+        with vcr.use_cassette(str(tmpdir.join("curl_transport.yaml"))):
+            response = DoSyncRequest(transport=CurlTransport())("GET", url)
+
+        with vcr.use_cassette(str(tmpdir.join("curl_transport.yaml"))) as cassette:
+            cassette_response = DoSyncRequest(transport=CurlTransport())("GET", url)
+
+            assert cassette_response.status_code == response.status_code
+            assert cassette.play_count == 1
+
+        with vcr.use_cassette(str(tmpdir.join("async_curl_transport.yaml"))):
+            response = DoAsyncRequest(transport=AsyncCurlTransport())("GET", url)
+
+        with vcr.use_cassette(str(tmpdir.join("async_curl_transport.yaml"))) as cassette:
+            cassette_response = DoAsyncRequest(transport=AsyncCurlTransport())("GET", url)
+
+            assert cassette_response.status_code == response.status_code
+            assert cassette.play_count == 1
+
+    try:
+        from pyreqwest.compatibility.httpx import HttpxTransport, SyncHttpxTransport
+    except ImportError:
+        pass
+    else:
+        with vcr.use_cassette(str(tmpdir.join("pyreqwest_transport.yaml"))):
+            response = DoSyncRequest(transport=SyncHttpxTransport())("GET", url)
+
+        with vcr.use_cassette(str(tmpdir.join("pyreqwest_transport.yaml"))) as cassette:
+            cassette_response = DoSyncRequest(transport=SyncHttpxTransport())("GET", url)
+
+            assert cassette_response.status_code == response.status_code
+            assert cassette.play_count == 1
+
+        with vcr.use_cassette(str(tmpdir.join("async_pyreqwest_transport.yaml"))):
+            response = DoAsyncRequest(transport=HttpxTransport())("GET", url)
+
+        with vcr.use_cassette(str(tmpdir.join("async_pyreqwest_transport.yaml"))) as cassette:
+            cassette_response = DoAsyncRequest(transport=HttpxTransport())("GET", url)
+
+            assert cassette_response.status_code == response.status_code
+            assert cassette.play_count == 1
