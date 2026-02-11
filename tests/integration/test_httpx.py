@@ -48,11 +48,11 @@ class DoSyncRequest(BaseDoRequest):
 
     def __call__(self, *args, **kwargs):
         if hasattr(self, "_client"):
-            return self.client.request(*args, timeout=60, **kwargs)
+            return self.client.request(*args, **kwargs)
 
         # Use one-time context and dispose of the client afterwards
         with self:
-            return self.client.request(*args, timeout=60, **kwargs)
+            return self.client.request(*args, **kwargs)
 
     def stream(self, *args, **kwargs):
         if hasattr(self, "_client"):
@@ -438,3 +438,12 @@ def test_custom_transports(tmpdir, httpbin):
 
             assert cassette_response.status_code == response.status_code
             assert cassette.play_count == 1
+
+
+def test_connection_limits(tmpdir, httpbin, do_request):
+    url = httpbin.url
+    limits = httpx.Limits(max_connections=1)
+
+    with vcr.use_cassette(str(tmpdir.join("connection_limits.yaml"))), do_request(limits=limits) as client:
+        for _ in range(2):
+            client("GET", url)

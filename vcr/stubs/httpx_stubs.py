@@ -3,6 +3,7 @@ import logging
 from collections import defaultdict
 
 from httpx import ByteStream, Response
+from httpx._exceptions import request_context
 
 from vcr.errors import CannotOverwriteExistingCassetteException
 from vcr.filters import decode_response
@@ -110,9 +111,13 @@ async def _vcr_handle_async_request(cassette, real_handle_async_request, self, r
         return vcr_response
 
     real_response = await real_handle_async_request(self, real_request)
-
-    # Reading the response stream consumes the iterator, so we need to restore it afterwards
     real_response_content = b"".join([part async for part in real_response.stream])
+
+    # Close the original stream so that the connection is released back to the connection pool
+    with request_context(request=real_response._request):
+        await real_response.stream.aclose()
+
+    # Reading the response stream consumes the iterator, so we need to restore it
     real_response.stream = ByteStream(real_response_content)
 
     _record_responses(cassette, vcr_request, real_response, real_response_content)
@@ -139,9 +144,13 @@ def _vcr_handle_request(cassette, real_handle_request, self, real_request):
         return vcr_response
 
     real_response = real_handle_request(self, real_request)
-
-    # Reading the response stream consumes the iterator, so we need to restore it afterwards
     real_response_content = b"".join(real_response.stream)
+
+    # Close the original stream so that the connection is released back to the connection pool
+    with request_context(request=real_response._request):
+        real_response.stream.close()
+
+    # Reading the response stream consumes the iterator, so we need to restore it
     real_response.stream = ByteStream(real_response_content)
 
     _record_responses(cassette, vcr_request, real_response, real_response_content)
